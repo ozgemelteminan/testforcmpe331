@@ -7,7 +7,10 @@ class PilotBase(BaseModel):
     gender: Optional[str]
     nationality: Optional[str]
     known_languages: Optional[List[str]] = []
-    vehicle_restriction: Optional[List[str]] = []
+    
+    # DÜZELTİLDİ: (Eksik 7) Dökümana göre "single" (tekil) olmalı
+    vehicle_restriction: Optional[str] = None # List[str] idi
+    
     allowed_range: Optional[int]
     seniority: Optional[str]
     extra: Optional[Dict[str,Any]] = {}

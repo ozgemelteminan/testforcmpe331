@@ -9,7 +9,10 @@ class Pilot(Base):
     gender = Column(String)
     nationality = Column(String)
     known_languages = Column(JSON)
-    vehicle_restriction = Column(JSON)
+    
+    # DÜZELTİLDİ: (Eksik 7) JSON (liste) yerine String (tekil)
+    vehicle_restriction = Column(String, nullable=True) # JSON idi
+    
     allowed_range = Column(Integer)
     seniority = Column(String)
     extra = Column(JSON)
