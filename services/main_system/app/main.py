@@ -1,5 +1,5 @@
 
-from fastapi import FastAPI\nfrom utils.postgres_adapter import get_engine, get_session, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker

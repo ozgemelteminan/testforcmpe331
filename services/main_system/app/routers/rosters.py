@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter\nfrom utils import roster_utils, seat_map, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends
 from ..main import SessionLocal
 from ..models import Flight, Roster
 from sqlalchemy.orm import Session
@@ -76,3 +76,12 @@ def export(roster_id: int, db: Session = Depends(get_db)):
     if not r:
         raise HTTPException(404, 'roster not found')
     return r.roster_snapshot
+
+
+def _save_roster_by_store(session, roster_obj):
+    store = os.getenv('ROSTER_STORE','sql')
+    if store == 'mongo':
+        mongo_uri = os.getenv('MONGO_URI','mongodb://localhost:27017')
+        return storage_adapter.save_roster_mongo(mongo_uri, roster_obj)
+    else:
+        return storage_adapter.save_roster_sql(session, roster_obj)
