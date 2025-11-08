@@ -1,69 +1,123 @@
-from typing import List, Dict
-from collections import defaultdict
-def assign_seats(passengers: List[Dict], seat_map: Dict) -> List[Dict]:
-    seats = {s['seat_id']: s for s in seat_map['seats']}
-    for p in passengers:
-        if p.get('seat_number'):
-            sid = p['seat_number']
-            if sid in seats:
-                seats[sid]['occupied'] = True
-    seats_by_row = defaultdict(list)
-    for s in seat_map['seats']:
-        seats_by_row[s['row']].append(s['seat_id'])
-    def find_block(row, needed, seat_type):
-        available = [sid for sid in seats_by_row[row] if not seats[sid]['occupied'] and seats[sid]['type']==seat_type]
-        if len(available) >= needed:
-            return available[:needed]
-        return None
-    handled = set()
-    id_map = {p['id']: p for p in passengers}
-    for p in passengers:
-        if p['id'] in handled:
-            continue
-        group_ids = [p['id']]
-        if p.get('affiliated'):
-            group_ids = [p['id']] + [aid for aid in p['affiliated'] if aid in id_map]
-        group = [id_map[g] for g in group_ids]
-        seat_type = group[0].get('seat_type', 'economy')
-        placed = False
-        for row in sorted(seats_by_row.keys()):
-            block = find_block(row, len(group), seat_type)
-            if block:
-                for gi, g in enumerate(group):
-                    g['seat_number'] = block[gi]
-                    seats[block[gi]]['occupied'] = True
-                    handled.add(g['id'])
-                placed = True
-                break
-    free_by_type = {'business': [], 'economy': []}
-    for s in seat_map['seats']:
-        if not seats[s['seat_id']]['occupied']:
-            free_by_type[s['type']].append(s['seat_id'])
-    for p in passengers:
-        if p.get('seat_number'): continue
-        pool = free_by_type.get(p.get('seat_type','economy')) or free_by_type['economy']
-        if not pool:
-            raise Exception("no available seats for passenger id {}".format(p['id']))
-        seat = pool.pop(0)
-        p['seat_number'] = seat
-        seats[seat]['occupied'] = True
-    return passengers
-def select_pilots(pool: List[Dict], vehicle: str, distance: int) -> List[Dict]:
-    seniors = [p for p in pool if p.get('seniority') == 'senior' and (not p.get('vehicle_restriction') or vehicle in (p.get('vehicle_restriction') if isinstance(p.get('vehicle_restriction'), list) else [p.get('vehicle_restriction')])) and p.get('allowed_range_km',0) >= distance]
-    juniors = [p for p in pool if p.get('seniority') == 'junior' and (not p.get('vehicle_restriction') or vehicle in (p.get('vehicle_restriction') if isinstance(p.get('vehicle_restriction'), list) else [p.get('vehicle_restriction')])) and p.get('allowed_range_km',0) >= distance]
-    trainees = [p for p in pool if p.get('seniority') == 'trainee' and (not p.get('vehicle_restriction') or vehicle in (p.get('vehicle_restriction') if isinstance(p.get('vehicle_restriction'), list) else [p.get('vehicle_restriction')])) and p.get('allowed_range_km',0) >= distance]
-    sel = []
+from typing import List, Dict, Any
+import itertools
+
+def select_pilots_by_seniority(candidates: List[Dict[str,Any]], flight) -> List[Dict]:
+    """Select pilots obeying rules:
+    - At least 1 senior and 1 junior
+    - At most 2 trainees overall
+    - Respect pilot.allowed_range >= flight.distance and vehicle restriction
+    Greedy selection.
+    """
+    seniors = [p for p in candidates if p.get('seniority') == 'senior']
+    juniors = [p for p in candidates if p.get('seniority') == 'junior']
+    trainees = [p for p in candidates if p.get('seniority') == 'trainee']
+    selected = []
+    # pick one senior, one junior if available
     if seniors:
-        sel.append(seniors.pop(0))
+        selected.append(seniors[0])
     if juniors:
-        sel.append(juniors.pop(0))
-    candidates = seniors + juniors
-    for c in candidates:
-        if len(sel) >= 3: break
-        sel.append(c)
-    tcount = 0
-    for t in trainees:
-        if len(sel) >= 3: break
-        if tcount >= 2: break
-        sel.append(t); tcount += 1
-    return sel
+        selected.append(juniors[0])
+    # fill additional slots (e.g., second pilot) prefer junior then trainee
+    remaining = [p for p in candidates if p not in selected]
+    for p in remaining:
+        if len([x for x in selected if x.get('seniority')=='trainee']) >= 2:
+            # can't add more trainees
+            if p.get('seniority') == 'trainee':
+                continue
+        selected.append(p)
+        if len(selected) >= 2:
+            break
+    # filter by vehicle and allowed_range if flight provided
+    if flight:
+        def ok(p):
+            if 'vehicle_restriction' in p and p['vehicle_restriction']:
+                if flight.get('vehicle_type') not in p['vehicle_restriction']:
+                    return False
+            if p.get('allowed_range') is not None:
+                if p['allowed_range'] < flight.get('distance', 0):
+                    return False
+            return True
+        selected = [p for p in selected if ok(p)]
+    return selected
+
+def select_attendants(candidates: List[Dict], flight) -> List[Dict]:
+    """Select cabin attendants: enforce 1-4 seniors, 4-16 juniors, 0-2 chefs.
+    Greedy selection by type.
+    """
+    chiefs = [a for a in candidates if a.get('attendant_type') == 'chief' or a.get('seniority')=='senior']
+    juniors = [a for a in candidates if a.get('seniority') == 'junior' and a.get('attendant_type')!='chef']
+    chefs = [a for a in candidates if a.get('attendant_type') == 'chef']
+    selected = []
+    # take 1-4 seniors (chiefs)
+    selected.extend(chiefs[:4])
+    # take 4-16 juniors
+    need_j = max(4, min(16, len(juniors)))
+    selected.extend(juniors[:need_j])
+    # take up to 2 chefs
+    selected.extend(chefs[:2])
+    # filter by vehicle restriction
+    if flight:
+        vt = flight.get('vehicle_type')
+        selected = [a for a in selected if (not a.get('vehicle_restriction')) or vt in a.get('vehicle_restriction',[])]
+    return selected
+
+def group_affiliated_passengers(passengers: List[Dict]) -> List[List[Dict]]:
+    """Group passengers by affiliated ids. Returns list of groups (each group is list of passenger dicts)."""
+    id_to = {p['id']: p for p in passengers}
+    visited = set()
+    groups = []
+    for p in passengers:
+        if p['id'] in visited:
+            continue
+        group = [p]
+        visited.add(p['id'])
+        aff = p.get('affiliated_ids') or []
+        for aid in aff:
+            if aid in id_to and aid not in visited:
+                group.append(id_to[aid])
+                visited.add(aid)
+        groups.append(group)
+    return groups
+
+def assign_affiliated_passengers(groups: List[List[Dict]], seat_map: List[str]) -> List[Dict]:
+    """Assign seats attempting to place each group in neighboring seats.
+    seat_map: flat list of seat identifiers (e.g., ['1A','1B',...]) assumed ordered by adjacency.
+    Returns flat passenger list with 'seat_number' assigned where possible.
+    """
+    assigned = []
+    free = list(seat_map)
+    for grp in groups:
+        size = len([p for p in grp if not p.get('infant')])
+        # try to find contiguous block of size
+        found_block = None
+        for i in range(len(free)-size+1):
+            block = free[i:i+size]
+            # accept any contiguous block
+            if len(block) == size:
+                found_block = (i, block)
+                break
+        if found_block:
+            idx, block = found_block
+            # assign seats to non-infants
+            bi = 0
+            for p in grp:
+                if p.get('infant'):
+                    p['seat_number'] = None
+                else:
+                    p['seat_number'] = block[bi]
+                    bi += 1
+            # remove used seats
+            for _ in range(size):
+                free.pop(0)
+        else:
+            # fallback: assign any available seats
+            for p in grp:
+                if p.get('infant'):
+                    p['seat_number'] = None
+                else:
+                    if free:
+                        p['seat_number'] = free.pop(0)
+                    else:
+                        p['seat_number'] = None
+        assigned.extend(grp)
+    return assigned
