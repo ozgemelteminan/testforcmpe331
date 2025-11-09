@@ -28,7 +28,7 @@ class FlightCreate(FlightBase):
 class FlightOut(FlightBase):
     id: int
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # --- YENİ EKLENDİ: Airport Şemaları ---
 class AirportBase(BaseModel):
@@ -43,7 +43,8 @@ class AirportCreate(AirportBase):
 class AirportOut(AirportBase):
     id: int
     class Config:
-        orm_mode = True
+        from_attributes = True
+        from_attributes = True
 
 # --- YENİ EKLENDİ: VehicleType Şemaları ---
 class VehicleTypeBase(BaseModel):
@@ -58,4 +59,4 @@ class VehicleTypeCreate(VehicleTypeBase):
 class VehicleTypeOut(VehicleTypeBase):
     id: int
     class Config:
-        orm_mode = True
+        from_attributes = True

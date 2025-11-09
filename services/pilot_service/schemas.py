@@ -20,4 +20,4 @@ class PilotCreate(PilotBase):
 class PilotOut(PilotBase):
     id: int
     class Config:
-        orm_mode = True
+        from_attributes = True

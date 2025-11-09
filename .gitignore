@@ -1,0 +1,10 @@
+# SQLite veritabanları
+*.db
+*.db-journal
+
+# Python cache dosyaları
+__pycache__/
+*.py[cod]
+
+# İşletim sistemi dosyaları
+.DS_Store

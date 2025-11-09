@@ -18,4 +18,4 @@ class AttendantCreate(AttendantBase):
 class AttendantOut(AttendantBase):
     id: int
     class Config:
-        orm_mode = True
+        from_attributes = True
