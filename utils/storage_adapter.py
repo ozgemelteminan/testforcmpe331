@@ -9,7 +9,7 @@ import json
 MONGO_URI = os.environ.get('MONGO_URI', 'mongodb://localhost:27017')
 MONGO_DB = os.environ.get('MONGO_DB', 'cmpe331')
 
-    def save_roster_by_store(db_or_client, roster: dict, store: str = "sql"):
+def save_roster_by_store(db_or_client, roster: dict, store: str = "sql"): # <--- GİRİNTİYİ SİLİN
     roster = dict(roster)
     roster['created_at'] = datetime.datetime.utcnow().isoformat()
     if store == "sql":

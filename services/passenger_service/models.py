@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, JSON
-from services.database import Base
+from .database import Base
 
 class Passenger(Base):
     __tablename__ = "passengers"
