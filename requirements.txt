@@ -4,6 +4,9 @@ SQLAlchemy
 pymongo
 python-jose[cryptography]
 passlib[bcrypt]
+bcrypt==3.2.0
 pydantic
 httpx
 python-multipart
+pandas
+openpyxl

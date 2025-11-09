@@ -1,16 +1,72 @@
 version: '3.8'
-services:
-  db:
-    image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: example
-      MYSQL_DATABASE: rosterdb
-      MYSQL_USER: roster
-      MYSQL_PASSWORD: rosterpass
-    ports:
-      - "3306:3306"
-    volumes:
-      - db_data:/var/lib/mysql
 
-volumes:
-  db_data:
+services:
+  # 1. Auth Servisi
+  auth:
+    build: .
+    command: uvicorn services.auth.app:app --host 0.0.0.0 --port 8005 --reload
+    volumes:
+      - .:/code
+    ports:
+      - "8005:8005"
+
+  # 2. Pilot Servisi
+  pilot:
+    build: .
+    command: uvicorn services.pilot_service.app:app --host 0.0.0.0 --port 8001 --reload
+    volumes:
+      - .:/code
+    ports:
+      - "8001:8001"
+
+  # 3. Kabin Servisi
+  cabin:
+    build: .
+    command: uvicorn services.cabin_service.app:app --host 0.0.0.0 --port 8002 --reload
+    volumes:
+      - .:/code
+    ports:
+      - "8002:8002"
+
+  # 4. Yolcu Servisi
+  passenger:
+    build: .
+    command: uvicorn services.passenger_service.app:app --host 0.0.0.0 --port 8003 --reload
+    volumes:
+      - .:/code
+    ports:
+      - "8003:8003"
+
+  # 5. Uçuş Bilgi Servisi
+  flight_info:
+    build: .
+    command: uvicorn services.flight_info_service.app:app --host 0.0.0.0 --port 8004 --reload
+    volumes:
+      - .:/code
+    ports:
+      - "8004:8004"
+
+  # 6. Ana Sistem (Orkestratör)
+  main_system:
+    build: .
+    command: uvicorn services.main_system.app:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/code
+    ports:
+      - "8000:8000"
+    # ÖNEMLİ:
+    # Ana sistemin diğer servisleri "http://localhost:8001" yerine
+    # "http://pilot:8001" olarak (servis adıyla) çağırması gerekir.
+    # Bu ortam değişkenlerini `main_system/routers.py` dosyan okuyacaktır.
+    environment:
+      - FLIGHT_SERVICE_URL=http://flight_info:8004
+      - PILOT_SERVICE_URL=http://pilot:8001
+      - CABIN_SERVICE_URL=http://cabin:8002
+      - PASSENGER_SERVICE_URL=http://passenger:8003
+    # Diğer servislerin tamamı başlamadan bu servisi başlatma
+    depends_on:
+      - auth
+      - pilot
+      - cabin
+      - passenger
+      - flight_info
