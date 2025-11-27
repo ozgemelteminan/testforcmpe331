@@ -9,7 +9,7 @@ from typing import List
 SECRET_KEY = os.environ.get('CMPE331_SECRET', 'CHANGE_THIS_SECRET')
 ALGORITHM = 'HS256'
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl='/auth/token')
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl='http://localhost:8005/auth/token')
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
     try:
